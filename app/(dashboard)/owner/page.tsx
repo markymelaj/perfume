@@ -1,54 +1,94 @@
-import { requireOwner } from '@/lib/auth/guards';
+import { InviteUserForm } from '@/components/forms/invite-user-form';
+import { CreateSupplierForm } from '@/components/forms/create-supplier-form';
+import { CreateProductForm } from '@/components/forms/create-product-form';
+import { CreateConsignmentForm } from '@/components/forms/create-consignment-form';
+import { CreateReconciliationForm } from '@/components/forms/create-reconciliation-form';
+import { CreateMessageForm } from '@/components/forms/create-message-form';
+import { DataTable } from '@/components/shared/data-table';
 import { KpiCard } from '@/components/shared/kpi-card';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import type { Profile, Sale, SaleItem, Reconciliation } from '@/lib/types';
+import { ToggleUserStatusButton } from '@/components/forms/toggle-user-status-button';
+import { ResetAccessButton } from '@/components/forms/reset-access-button';
+import { Card } from '@/components/ui/card';
 import { formatCurrency } from '@/lib/utils';
-import { buildCashSummary } from '@/lib/server-data';
+import { getAdminDashboardData } from '@/lib/server-data';
+import { requireAdmin } from '@/lib/auth/guards';
 
-export default async function OwnerDashboardPage() {
-  const { supabase } = await requireOwner();
+export const dynamic = 'force-dynamic';
 
-  const [{ data: sellers }, { data: sales }, { data: salesItems }, { data: reconciliations }] =
-    await Promise.all([
-      supabase.from('profiles').select('*').eq('role', 'seller').order('created_at', { ascending: false }),
-      supabase.from('sales').select('*').order('sold_at', { ascending: false }).limit(10),
-      supabase.from('sales_items').select('*'),
-      supabase.from('reconciliations').select('*').order('created_at', { ascending: false }).limit(10)
+export default async function OwnerPage() {
+  const profile = await requireAdmin();
+  const { profiles, suppliers, products, consignments, items, messages, metrics } = await getAdminDashboardData();
+
+  const sellerRows = profiles
+    .filter((row) => row.role !== 'super_admin')
+    .map((row) => [
+      row.display_name ?? 'Sin nombre',
+      row.email ?? '-',
+      row.role,
+      row.is_active ? 'Activo' : 'Inactivo',
+      <div key={row.id} className="flex flex-wrap gap-2">
+        <ToggleUserStatusButton userId={row.id} isActive={row.is_active} />
+        <ResetAccessButton userId={row.id} />
+      </div>,
     ]);
 
-  const summary = buildCashSummary({
-    sales: (sales as Sale[]) ?? [],
-    salesItems: (salesItems as SaleItem[]) ?? [],
-    reconciliations: (reconciliations as Reconciliation[]) ?? []
-  });
-
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-3xl font-semibold text-white">Panel del dueño</h2>
-        <p className="mt-1 text-zinc-400">
-          Control centralizado de vendedores, stock, caja, rendiciones y mensajería interna.
-        </p>
-      </div>
+    <div className="space-y-8">
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <KpiCard title="Vendedores" value={String(metrics.sellers)} />
+        <KpiCard title="Productos" value={String(metrics.products)} />
+        <KpiCard title="Consignaciones abiertas" value={String(metrics.openConsignments)} />
+        <KpiCard title="Pendiente por rendir" value={formatCurrency(metrics.pendiente)} />
+      </section>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <KpiCard label="Vendedores activos" value={String(((sellers as Profile[]) ?? []).filter((item) => item.is_active).length)} />
-        <KpiCard label="Total vendido" value={formatCurrency(summary.totalSold)} />
-        <KpiCard label="Pendiente por rendir" value={formatCurrency(summary.pendiente)} />
-      </div>
+      <section className="grid gap-6 xl:grid-cols-2">
+        <Card>
+          <h2 className="mb-4 text-xl font-semibold">Usuarios</h2>
+          <InviteUserForm currentRole={profile.role} />
+        </Card>
+        <Card>
+          <h2 className="mb-4 text-xl font-semibold">Proveedores</h2>
+          <CreateSupplierForm />
+        </Card>
+        <Card>
+          <h2 className="mb-4 text-xl font-semibold">Productos</h2>
+          <CreateProductForm suppliers={suppliers} />
+        </Card>
+        <Card>
+          <h2 className="mb-4 text-xl font-semibold">Asignar consignación</h2>
+          <CreateConsignmentForm sellers={profiles.filter((row) => row.role === 'seller' && row.is_active)} suppliers={suppliers} products={products} />
+        </Card>
+        <Card>
+          <h2 className="mb-4 text-xl font-semibold">Rendición manual</h2>
+          <CreateReconciliationForm consignments={consignments} items={items} />
+        </Card>
+        <Card>
+          <h2 className="mb-4 text-xl font-semibold">Mensaje a vendedor</h2>
+          <CreateMessageForm sellers={profiles.filter((row) => row.role === 'seller')} />
+        </Card>
+      </section>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Qué resuelve esta app</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-3 text-sm text-zinc-300">
-          <p>• Alta controlada de vendedores y acceso privado invite-only.</p>
-          <p>• Asignación de stock por consignación, con precio y cantidad definidos por el dueño.</p>
-          <p>• Registro de ventas desde teléfono, con impacto directo en caja y saldo pendiente.</p>
-          <p>• Rendiciones parciales o totales con devolución opcional de stock.</p>
-          <p>• Ubicación puntual y mensajería interna solo entre vendedor y dueño.</p>
-        </CardContent>
+        <h2 className="mb-4 text-xl font-semibold">Usuarios cargados</h2>
+        <DataTable headers={['Nombre', 'Correo', 'Rol', 'Estado', 'Acciones']} rows={sellerRows} />
       </Card>
+
+      <section className="grid gap-6 xl:grid-cols-2">
+        <Card>
+          <h2 className="mb-4 text-xl font-semibold">Consignaciones</h2>
+          <DataTable
+            headers={['Vendedor', 'Estado', 'Abierta']}
+            rows={consignments.map((row) => [row.seller_id, row.status, new Date(row.opened_at).toLocaleString('es-CL')])}
+          />
+        </Card>
+        <Card>
+          <h2 className="mb-4 text-xl font-semibold">Mensajes recientes</h2>
+          <DataTable
+            headers={['Vendedor', 'Mensaje', 'Fecha']}
+            rows={messages.map((row) => [row.seller_id, row.body, new Date(row.created_at).toLocaleString('es-CL')])}
+          />
+        </Card>
+      </section>
     </div>
   );
 }

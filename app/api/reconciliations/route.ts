@@ -1,65 +1,50 @@
 import { NextResponse } from 'next/server';
 import { reconciliationSchema } from '@/lib/validators';
-import { getCurrentProfile, jsonError } from '@/app/api/_helpers';
+import { createClient } from '@/lib/supabase/server';
+import { requireProfile } from '@/lib/auth/guards';
 
 export async function POST(request: Request) {
-  const { supabase, profile } = await getCurrentProfile();
-  if (!profile || profile.role !== 'owner') {
-    return jsonError('No autorizado', 403);
+  const actor = await requireProfile();
+  const json = await request.json();
+  const parsed = reconciliationSchema.safeParse(json);
+
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Datos inválidos' }, { status: 400 });
   }
 
-  const body = reconciliationSchema.safeParse(await request.json());
-  if (!body.success) {
-    return jsonError('Datos inválidos');
-  }
-
-  const { data: consignment, error: consignmentError } = await supabase
-    .from('consignments')
-    .select('*')
-    .eq('id', body.data.consignment_id)
-    .single();
-
-  if (consignmentError || !consignment) {
-    return jsonError('Consignación no encontrada.');
-  }
-
-  const { data: reconciliation, error: reconciliationError } = await supabase
+  const supabase = await createClient();
+  const reconciliation = await supabase
     .from('reconciliations')
-    .insert({
-      consignment_id: body.data.consignment_id,
-      type: body.data.type,
-      cash_received: body.data.cash_received,
-      transfer_received: body.data.transfer_received,
-      notes: body.data.notes ?? null,
-      created_by: profile.id
-    })
-    .select('*')
+    .insert([
+      {
+        consignment_id: parsed.data.consignment_id,
+        type: parsed.data.type,
+        cash_received: parsed.data.cash_received,
+        transfer_received: parsed.data.transfer_received,
+        notes: parsed.data.notes || null,
+        created_by: actor.id,
+      },
+    ])
+    .select('id')
     .single();
 
-  if (reconciliationError || !reconciliation) {
-    return jsonError(reconciliationError?.message ?? 'No se pudo crear la rendición.');
+  if (reconciliation.error || !reconciliation.data) {
+    return NextResponse.json({ error: reconciliation.error?.message ?? 'No se pudo registrar la rendición' }, { status: 400 });
   }
 
-  for (const item of body.data.returns ?? []) {
-    if (item.quantity_returned <= 0) continue;
+  if (parsed.data.consignment_item_id && (parsed.data.quantity_returned ?? 0) > 0) {
+    const item = await supabase.from('reconciliation_items').insert([
+      {
+        reconciliation_id: reconciliation.data.id,
+        consignment_item_id: parsed.data.consignment_item_id,
+        quantity_returned: parsed.data.quantity_returned ?? 0,
+      },
+    ]);
 
-    const { error } = await supabase.from('reconciliation_items').insert({
-      reconciliation_id: reconciliation.id,
-      consignment_item_id: item.consignment_item_id,
-      quantity_returned: item.quantity_returned
-    });
-
-    if (error) {
-      await supabase.from('reconciliations').delete().eq('id', reconciliation.id);
-      return jsonError(error.message);
+    if (item.error) {
+      return NextResponse.json({ error: item.error.message }, { status: 400 });
     }
   }
 
-  if (body.data.type === 'total') {
-    await supabase.from('consignments').update({ status: 'closed' }).eq('id', body.data.consignment_id);
-  } else {
-    await supabase.from('consignments').update({ status: 'partially_reconciled' }).eq('id', body.data.consignment_id);
-  }
-
-  return NextResponse.json({ message: 'Rendición registrada.' });
+  return NextResponse.json({ ok: true });
 }

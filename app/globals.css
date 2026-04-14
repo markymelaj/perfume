@@ -6,32 +6,16 @@
   color-scheme: dark;
 }
 
-html,
-body {
+html, body {
   min-height: 100%;
+  background: #030712;
+  color: #f8fafc;
 }
 
 body {
-  @apply bg-black text-zinc-100 antialiased;
+  font-family: Arial, Helvetica, sans-serif;
 }
 
-a {
-  @apply text-inherit no-underline;
-}
-
-table {
-  @apply w-full border-collapse;
-}
-
-th,
-td {
-  @apply border-b border-zinc-800 px-3 py-3 text-left text-sm align-top;
-}
-
-th {
-  @apply text-zinc-400 font-medium;
-}
-
-td {
-  @apply text-zinc-200;
+* {
+  border-color: #27272a;
 }

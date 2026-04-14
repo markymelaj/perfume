@@ -1,72 +1,92 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { createUserSchema } from '@/lib/validators';
+import type { AppRole } from '@/lib/types';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select } from '@/components/ui/select';
 import { FormMessage } from '@/components/shared/form-message';
 
-export function InviteUserForm() {
+export function InviteUserForm({ currentRole }: { currentRole: AppRole }) {
   const router = useRouter();
-  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setError(null);
+    setSuccess(null);
     setLoading(true);
-    setMessage(null);
 
     const formData = new FormData(event.currentTarget);
+    const payload = {
+      email: String(formData.get('email') ?? ''),
+      password: String(formData.get('password') ?? ''),
+      display_name: String(formData.get('display_name') ?? ''),
+      phone: String(formData.get('phone') ?? ''),
+      role: String(formData.get('role') ?? 'seller'),
+    };
 
-    const response = await fetch('/api/admin/invite-user', {
+    const parsed = createUserSchema.safeParse(payload);
+    if (!parsed.success) {
+      setLoading(false);
+      setError(parsed.error.issues[0]?.message ?? 'Datos inválidos');
+      return;
+    }
+
+    const response = await fetch('/api/admin/users', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email: formData.get('email'),
-        displayName: formData.get('displayName'),
-        phone: formData.get('phone'),
-        password: formData.get('password')
-      })
+      body: JSON.stringify(parsed.data),
     });
-
-    const data = await response.json();
+    const result = await response.json();
     setLoading(false);
-    setMessage(data.message ?? (response.ok ? 'Usuario creado.' : 'No se pudo crear el usuario.'));
-    if (response.ok) {
-      event.currentTarget.reset();
-      router.refresh();
+
+    if (!response.ok) {
+      setError(result.error ?? 'No se pudo crear el usuario');
+      return;
     }
+
+    setSuccess('Usuario creado correctamente.');
+    event.currentTarget.reset();
+    router.refresh();
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Crear vendedor</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form className="grid gap-4" onSubmit={onSubmit}>
-          <div>
-            <Label>Nombre</Label>
-            <Input name="displayName" placeholder="Camila Soto" required />
-          </div>
-          <div>
-            <Label>Email</Label>
-            <Input name="email" type="email" placeholder="camila@dominio.com" required />
-          </div>
-          <div>
-            <Label>Teléfono</Label>
-            <Input name="phone" placeholder="+56 9 ..." />
-          </div>
-          <div>
-            <Label>Contraseña temporal</Label>
-            <Input name="password" type="text" placeholder="Min. 8 caracteres" required minLength={8} />
-          </div>
-          <Button disabled={loading}>{loading ? 'Creando...' : 'Crear vendedor'}</Button>
-          <FormMessage message={message} />
-        </form>
-      </CardContent>
-    </Card>
+    <form className="space-y-4" onSubmit={handleSubmit}>
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="display_name">Nombre</Label>
+          <Input id="display_name" name="display_name" required />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="phone">Teléfono</Label>
+          <Input id="phone" name="phone" />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="email">Correo</Label>
+          <Input id="email" name="email" type="email" required />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="password">Contraseña temporal</Label>
+          <Input id="password" name="password" type="password" required />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="role">Rol</Label>
+          <Select defaultValue="seller" id="role" name="role">
+            <option value="seller">seller</option>
+            <option value="owner" disabled={currentRole !== 'super_admin'}>
+              owner
+            </option>
+          </Select>
+        </div>
+      </div>
+      <FormMessage error={error} success={success} />
+      <Button disabled={loading} type="submit">{loading ? 'Creando...' : 'Crear usuario'}</Button>
+    </form>
   );
 }

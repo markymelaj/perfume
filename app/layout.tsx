@@ -3,7 +3,7 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: 'Consigna Privada',
-  description: 'App interna de venta a consignación'
+  description: 'App interna para venta a consignación',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

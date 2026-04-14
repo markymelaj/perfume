@@ -1,90 +1,96 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState } from 'react';
+import type { Consignment, ConsignmentItem } from '@/lib/types';
+import { saleSchema } from '@/lib/validators';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { FormMessage } from '@/components/shared/form-message';
 
-export function RecordSaleForm({
-  items
-}: {
-  items: Array<{
-    id: string;
-    product_name: string;
-    remaining: number;
-    unit_sale_price: number;
-  }>;
-}) {
+export function RecordSaleForm({ consignments, items }: { consignments: Consignment[]; items: ConsignmentItem[] }) {
   const router = useRouter();
-  const [message, setMessage] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
-  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setMessage(null);
+    setError(null);
+    setSuccess(null);
     const formData = new FormData(event.currentTarget);
+    const payload = {
+      consignment_id: String(formData.get('consignment_id') ?? ''),
+      consignment_item_id: String(formData.get('consignment_item_id') ?? ''),
+      quantity: String(formData.get('quantity') ?? '0'),
+      payment_method: String(formData.get('payment_method') ?? 'cash'),
+      notes: String(formData.get('notes') ?? ''),
+    };
 
+    const parsed = saleSchema.safeParse(payload);
+    if (!parsed.success) {
+      setError(parsed.error.issues[0]?.message ?? 'Datos inválidos');
+      return;
+    }
+
+    setLoading(true);
     const response = await fetch('/api/sales', {
       method: 'POST',
-      body: JSON.stringify({
-        consignment_item_id: formData.get('consignment_item_id'),
-        quantity: formData.get('quantity'),
-        payment_method: formData.get('payment_method'),
-        notes: formData.get('notes') || null
-      })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(parsed.data),
     });
+    const result = await response.json();
+    setLoading(false);
 
-    const data = await response.json();
-    setMessage(data.message ?? (response.ok ? 'Venta registrada.' : 'No se pudo registrar.'));
-    if (response.ok) {
-      event.currentTarget.reset();
-      router.refresh();
+    if (!response.ok) {
+      setError(result.error ?? 'No se pudo registrar la venta');
+      return;
     }
+
+    setSuccess('Venta registrada.');
+    event.currentTarget.reset();
+    router.refresh();
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Registrar venta</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form className="grid gap-4" onSubmit={onSubmit}>
-          <div>
-            <Label>Producto asignado</Label>
-            <Select name="consignment_item_id" required defaultValue="">
-              <option value="" disabled>Selecciona producto</option>
-              {items.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.product_name} · Disponible: {item.remaining} · {item.unit_sale_price}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <Label>Cantidad</Label>
-              <Input name="quantity" type="number" min="1" required />
-            </div>
-            <div>
-              <Label>Pago</Label>
-              <Select name="payment_method" defaultValue="cash">
-                <option value="cash">Efectivo</option>
-                <option value="transfer">Transferencia</option>
-                <option value="mixed">Mixto</option>
-              </Select>
-            </div>
-          </div>
-          <div>
-            <Label>Notas</Label>
-            <Input name="notes" />
-          </div>
-          <Button>Guardar venta</Button>
-          <FormMessage message={message} />
-        </form>
-      </CardContent>
-    </Card>
+    <form className="space-y-4" onSubmit={handleSubmit}>
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="consignment_id">Consignación</Label>
+          <Select id="consignment_id" name="consignment_id" required defaultValue="">
+            <option value="" disabled>Selecciona</option>
+            {consignments.map((consignment) => <option key={consignment.id} value={consignment.id}>{consignment.id.slice(0, 8)} · {consignment.status}</option>)}
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="consignment_item_id">Ítem</Label>
+          <Select id="consignment_item_id" name="consignment_item_id" required defaultValue="">
+            <option value="" disabled>Selecciona</option>
+            {items.map((item) => <option key={item.id} value={item.id}>{item.products?.name ?? item.product_id}</option>)}
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="quantity">Cantidad</Label>
+          <Input id="quantity" name="quantity" type="number" min="1" required />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="payment_method">Pago</Label>
+          <Select id="payment_method" name="payment_method" defaultValue="cash">
+            <option value="cash">Efectivo</option>
+            <option value="transfer">Transferencia</option>
+            <option value="mixed">Mixto</option>
+          </Select>
+        </div>
+        <div className="space-y-2 md:col-span-2">
+          <Label htmlFor="notes">Notas</Label>
+          <Textarea id="notes" name="notes" />
+        </div>
+      </div>
+      <FormMessage error={error} success={success} />
+      <Button disabled={loading} type="submit">{loading ? 'Guardando...' : 'Registrar venta'}</Button>
+    </form>
   );
 }

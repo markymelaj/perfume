@@ -1,21 +1,17 @@
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 
-export function KpiCard({
-  label,
-  value,
-  hint
-}: {
-  label: string;
+type KpiCardProps = {
+  title: string;
   value: string;
   hint?: string;
-}) {
+};
+
+export function KpiCard({ title, value, hint }: KpiCardProps) {
   return (
     <Card>
-      <CardContent className="space-y-1">
-        <div className="text-sm text-zinc-500">{label}</div>
-        <div className="text-3xl font-semibold text-white">{value}</div>
-        {hint ? <div className="text-xs text-zinc-500">{hint}</div> : null}
-      </CardContent>
+      <div className="text-sm text-zinc-500">{title}</div>
+      <div className="mt-2 text-2xl font-semibold text-white">{value}</div>
+      {hint ? <div className="mt-2 text-xs text-zinc-500">{hint}</div> : null}
     </Card>
   );
 }

@@ -1,114 +1,38 @@
 # Consigna Privada
 
-Starter interno para venta a consignación con Next.js, Supabase, GitHub y Vercel.
+Starter interno para venta a consignación con Supabase + Next.js + Vercel.
 
-## Incluye
-
-- Login privado e invite-only
-- Roles `owner` y `seller`
-- Productos y proveedores
-- Consignaciones
-- Registro de ventas
-- Caja por vendedor
-- Rendiciones parciales o totales
+## Qué incluye
+- Login por email + contraseña
+- Roles `super_admin`, `owner`, `seller`
+- Alta manual de usuarios sin depender del magic link
+- Activar / desactivar vendedores
+- Reset manual de contraseña temporal
+- Proveedores, productos, consignaciones, ventas y rendiciones
 - Ubicación puntual
-- Mensajería interna `owner ↔ seller`
-- Auditoría
-- SQL base para Supabase
-- Preparado para Vercel
+- Mensajería interna owner/seller
 
-## Tecnologías
+## Variables de entorno
+Copia `.env.example` a `.env.local`.
 
-- Next.js App Router
-- TypeScript
-- Tailwind CSS
-- Supabase Auth + Database + RLS
-- `@supabase/ssr` para SSR con cookies
-- GitHub + Vercel
+## Puesta en marcha
+1. Crea proyecto en Supabase.
+2. Ejecuta `supabase/schema.sql`.
+3. Ejecuta la migración `supabase/migrations/20260414_super_admin_password_auth.sql` en 2 bloques separados.
+4. Crea tu primer usuario en Supabase Auth.
+5. Conviértelo a `super_admin`.
+6. Despliega en Vercel con las variables correctas.
 
-## Antes de empezar
-
-### 1) Crear el proyecto en Supabase
-Crea un proyecto nuevo y separado para esta app.
-
-### 2) Ejecutar el SQL
-Abre el SQL Editor y corre:
-
-- `supabase/schema.sql`
-
-Opcional:
-- `supabase/seed.sql`
-
-### 3) Desactivar registro libre
-En Supabase Auth, desactiva el registro libre. El login está pensado para usuarios previamente creados o invitados.
-
-### 4) Crear el primer owner
-Crea un usuario desde **Authentication > Users** y luego corre:
+## Usuario inicial
+Después de crear tu usuario en Auth:
 
 ```sql
 update public.profiles
-set role = 'owner', is_active = true, must_reenroll_security = false
-where email = 'tu_correo@dominio.com';
+set role = 'super_admin', is_active = true, must_reenroll_security = false
+where email = 'TU_CORREO';
 ```
 
-### 5) Variables de entorno
-Copia `.env.example` a `.env.local` y completa:
-
-```bash
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
-NEXT_PUBLIC_APP_URL=http://localhost:3000
-```
-
-## Desarrollo local
-
-```bash
-npm install
-npm run dev
-```
-
-## Despliegue en Vercel
-
-1. Sube este proyecto a GitHub.
-2. Importa el repo en Vercel.
-3. Agrega las mismas variables de entorno del `.env.local`.
-4. Define `NEXT_PUBLIC_APP_URL` con la URL final de Vercel.
-5. En Supabase Auth, agrega esa URL como Site URL y Redirect URL.
-
-## Flujo de acceso
-
-- El owner invita vendedores desde el panel.
-- El vendedor recibe acceso inicial por email.
-- El login usa magic link con `shouldCreateUser: false`.
-- Existe una bandera `must_reenroll_security` para preparar un flujo de refuerzo de seguridad y recuperación.
-
-## Estado actual del proyecto
-
-Este starter deja operativos los módulos principales de negocio y el esquema de seguridad cerrado.
-La parte de passkeys / WebAuthn queda **preparada a nivel de arquitectura**, pero no está implementada completamente en esta primera versión. La recuperación actual se resuelve reiniciando el acceso desde owner y volviendo a emitir ingreso inicial.
-
-## Estructura principal
-
-- `/login`
-- `/owner`
-- `/owner/users`
-- `/owner/products`
-- `/owner/consignments`
-- `/owner/reconciliations`
-- `/owner/messages`
-- `/owner/locations`
-- `/owner/audit`
-- `/seller`
-- `/seller/stock`
-- `/seller/sales`
-- `/seller/cash`
-- `/seller/messages`
-- `/seller/location`
-
-## Notas
-
-- Todas las lecturas sensibles pasan por RLS.
-- Las escrituras principales pasan por route handlers del backend.
-- El seller no ve ni interactúa con otros sellers.
-- La mensajería interna es solo `owner ↔ seller`.
+## Recomendaciones
+- Desactiva signup libre en Supabase.
+- Mantén `SUPABASE_SERVICE_ROLE_KEY` solo en Vercel y nunca en frontend.
+- Usa SMTP propio solo si luego quieres recuperación por correo.

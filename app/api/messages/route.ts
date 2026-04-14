@@ -1,52 +1,49 @@
 import { NextResponse } from 'next/server';
-import { getCurrentProfile, jsonError } from '@/app/api/_helpers';
+import { createClient } from '@/lib/supabase/server';
+import { getCurrentProfile, isAdminRole } from '@/lib/auth/guards';
 import { messageSchema } from '@/lib/validators';
 import type { Profile } from '@/lib/types';
 
 export async function POST(request: Request) {
-  const { supabase, profile } = await getCurrentProfile();
-  if (!profile) {
-    return jsonError('No autorizado', 403);
+  const actor = await getCurrentProfile();
+  if (!actor) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+
+  const json = await request.json();
+  const parsed = messageSchema.safeParse(json);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Datos inválidos' }, { status: 400 });
   }
 
-  const body = messageSchema.safeParse(await request.json());
-  if (!body.success) {
-    return jsonError('Datos inválidos');
-  }
+  const supabase = await createClient();
+  let sellerId = parsed.data.seller_id || '';
+  let ownerId = '';
 
-  let ownerId = profile.role === 'owner' ? profile.id : '';
-  let sellerId = profile.role === 'seller' ? profile.id : body.data.seller_id ?? '';
-
-  if (profile.role === 'seller') {
-    const { data: owner } = await supabase
+  if (isAdminRole(actor.role)) {
+    if (!sellerId) return NextResponse.json({ error: 'Selecciona un vendedor' }, { status: 400 });
+    ownerId = actor.id;
+  } else {
+    sellerId = actor.id;
+    const owner = await supabase
       .from('profiles')
       .select('*')
-      .eq('role', 'owner')
+      .in('role', ['owner', 'super_admin'])
       .eq('is_active', true)
+      .order('created_at', { ascending: true })
       .limit(1)
-      .single();
-
-    if (!owner) {
-      return jsonError('No se encontró un owner activo.');
-    }
-
-    ownerId = owner.id;
+      .maybeSingle();
+    if (!owner.data) return NextResponse.json({ error: 'No hay dueño activo disponible' }, { status: 400 });
+    ownerId = (owner.data as Profile).id;
   }
 
-  if (profile.role === 'owner' && !sellerId) {
-    return jsonError('Debes indicar el vendedor.');
-  }
+  const { error } = await supabase.from('internal_messages').insert([
+    {
+      owner_id: ownerId,
+      seller_id: sellerId,
+      sender_id: actor.id,
+      body: parsed.data.body,
+    },
+  ]);
 
-  const { error } = await supabase.from('internal_messages').insert({
-    owner_id: ownerId,
-    seller_id: sellerId,
-    sender_id: profile.id,
-    body: body.data.body
-  });
-
-  if (error) {
-    return jsonError(error.message);
-  }
-
-  return NextResponse.json({ message: 'Mensaje enviado.' });
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  return NextResponse.json({ ok: true });
 }

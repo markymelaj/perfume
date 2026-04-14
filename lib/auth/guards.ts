@@ -1,39 +1,43 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import type { AppRole, Profile } from '@/lib/types';
 
-export async function requireAuthenticatedProfile() {
+export const isAdminRole = (role: AppRole) => role === 'super_admin' || role === 'owner';
+
+export async function getCurrentProfile(): Promise<Profile | null> {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: authData } = await supabase.auth.getUser();
 
-  if (!user) {
-    redirect('/login');
-  }
+  if (!authData.user) return null;
 
-  const { data: profile } = await supabase
+  const { data } = await supabase
     .from('profiles')
     .select('*')
-    .eq('id', user.id)
-    .single();
+    .eq('id', authData.user.id)
+    .maybeSingle();
 
-  if (!profile || !profile.is_active) {
-    redirect('/login?error=inactive');
-  }
-
-  return { supabase, user, profile };
+  return (data as Profile | null) ?? null;
 }
 
-export async function requireOwner() {
-  const result = await requireAuthenticatedProfile();
-  if (!['owner', 'super_admin'].includes(result.profile.role)) {
+export async function requireProfile() {
+  const profile = await getCurrentProfile();
+  if (!profile) redirect('/login');
+  if (!profile.is_active) redirect('/login?error=inactive');
+  return profile;
+}
+
+export async function requireAdmin() {
+  const profile = await requireProfile();
+  if (!isAdminRole(profile.role)) {
     redirect('/seller');
   }
-  return result;
+  return profile;
 }
 
 export async function requireSeller() {
-  const result = await requireAuthenticatedProfile();
-  if (result.profile.role === 'seller') {
-    return result;
+  const profile = await requireProfile();
+  if (isAdminRole(profile.role)) {
+    redirect('/owner');
   }
-  redirect('/owner');
+  return profile;
 }

@@ -1,112 +1,74 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState } from 'react';
+import type { Profile } from '@/lib/types';
+import { messageSchema } from '@/lib/validators';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { FormMessage } from '@/components/shared/form-message';
 
-export function OwnerMessageForm({
-  sellers
-}: {
-  sellers: Array<{ id: string; display_name: string | null; email: string | null }>;
-}) {
+export function CreateMessageForm({ sellers }: { sellers?: Profile[] }) {
   const router = useRouter();
-  const [message, setMessage] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
-  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setMessage(null);
-    const formData = new FormData(event.currentTarget);
+    setError(null);
+    setSuccess(null);
 
+    const formData = new FormData(event.currentTarget);
+    const payload = {
+      seller_id: String(formData.get('seller_id') ?? ''),
+      body: String(formData.get('body') ?? ''),
+    };
+
+    const parsed = messageSchema.safeParse(payload);
+    if (!parsed.success) {
+      setError(parsed.error.issues[0]?.message ?? 'Datos inválidos');
+      return;
+    }
+
+    setLoading(true);
     const response = await fetch('/api/messages', {
       method: 'POST',
-      body: JSON.stringify({
-        seller_id: formData.get('seller_id'),
-        body: formData.get('body')
-      })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(parsed.data),
     });
+    const result = await response.json();
+    setLoading(false);
 
-    const data = await response.json();
-    setMessage(data.message ?? (response.ok ? 'Mensaje enviado.' : 'No se pudo enviar.'));
-    if (response.ok) {
-      event.currentTarget.reset();
-      router.refresh();
+    if (!response.ok) {
+      setError(result.error ?? 'No se pudo enviar el mensaje');
+      return;
     }
+
+    setSuccess('Mensaje enviado.');
+    event.currentTarget.reset();
+    router.refresh();
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Nuevo mensaje</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form className="grid gap-4" onSubmit={onSubmit}>
-          <div>
-            <Label>Vendedor</Label>
-            <Select name="seller_id" required defaultValue="">
-              <option value="" disabled>Selecciona vendedor</option>
-              {sellers.map((seller) => (
-                <option key={seller.id} value={seller.id}>
-                  {seller.display_name ?? seller.email}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div>
-            <Label>Mensaje</Label>
-            <Textarea name="body" required />
-          </div>
-          <Button>Enviar mensaje</Button>
-          <FormMessage message={message} />
-        </form>
-      </CardContent>
-    </Card>
-  );
-}
-
-export function SellerMessageForm() {
-  const router = useRouter();
-  const [message, setMessage] = useState<string | null>(null);
-
-  async function onSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setMessage(null);
-    const formData = new FormData(event.currentTarget);
-
-    const response = await fetch('/api/messages', {
-      method: 'POST',
-      body: JSON.stringify({
-        body: formData.get('body')
-      })
-    });
-
-    const data = await response.json();
-    setMessage(data.message ?? (response.ok ? 'Mensaje enviado.' : 'No se pudo enviar.'));
-    if (response.ok) {
-      event.currentTarget.reset();
-      router.refresh();
-    }
-  }
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Escribir al dueño</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form className="grid gap-4" onSubmit={onSubmit}>
-          <div>
-            <Label>Mensaje</Label>
-            <Textarea name="body" required />
-          </div>
-          <Button>Enviar mensaje</Button>
-          <FormMessage message={message} />
-        </form>
-      </CardContent>
-    </Card>
+    <form className="space-y-4" onSubmit={handleSubmit}>
+      {sellers ? (
+        <div className="space-y-2">
+          <Label htmlFor="seller_id">Vendedor</Label>
+          <Select id="seller_id" name="seller_id" defaultValue="" required>
+            <option value="" disabled>Selecciona</option>
+            {sellers.map((seller) => <option key={seller.id} value={seller.id}>{seller.display_name ?? seller.email}</option>)}
+          </Select>
+        </div>
+      ) : null}
+      <div className="space-y-2">
+        <Label htmlFor="body">Mensaje</Label>
+        <Textarea id="body" name="body" required />
+      </div>
+      <FormMessage error={error} success={success} />
+      <Button disabled={loading} type="submit">{loading ? 'Enviando...' : 'Enviar mensaje'}</Button>
+    </form>
   );
 }

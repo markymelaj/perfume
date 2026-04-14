@@ -1,66 +1,69 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { FormMessage } from '@/components/shared/form-message';
 
 export function SendLocationForm() {
-  const [note, setNote] = useState('');
-  const [message, setMessage] = useState<string | null>(null);
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
-  async function sendLocation() {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+    setSuccess(null);
+
     if (!navigator.geolocation) {
-      setMessage('Este dispositivo no soporta geolocalización.');
+      setError('Este dispositivo no soporta geolocalización.');
       return;
     }
 
+    const note = String(new FormData(event.currentTarget).get('note') ?? '');
     setLoading(true);
-    setMessage(null);
 
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const response = await fetch('/api/location', {
           method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
-            note: note || null
-          })
+            note,
+          }),
         });
-
-        const data = await response.json();
+        const result = await response.json();
         setLoading(false);
-        setMessage(data.message ?? (response.ok ? 'Ubicación enviada.' : 'No se pudo enviar.'));
-        if (response.ok) {
-          setNote('');
+
+        if (!response.ok) {
+          setError(result.error ?? 'No se pudo guardar la ubicación');
+          return;
         }
+
+        setSuccess('Ubicación enviada.');
+        event.currentTarget.reset();
+        router.refresh();
       },
       () => {
         setLoading(false);
-        setMessage('No fue posible obtener la ubicación.');
-      }
+        setError('No se pudo obtener tu ubicación.');
+      },
     );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Enviar ubicación</CardTitle>
-      </CardHeader>
-      <CardContent className="grid gap-4">
-        <div>
-          <Label>Nota opcional</Label>
-          <Input value={note} onChange={(event) => setNote(event.target.value)} placeholder="Punto de venta actual" />
-        </div>
-        <Button onClick={sendLocation} disabled={loading}>
-          {loading ? 'Enviando...' : 'Enviar ubicación actual'}
-        </Button>
-        <FormMessage message={message} />
-      </CardContent>
-    </Card>
+    <form className="space-y-4" onSubmit={handleSubmit}>
+      <div className="space-y-2">
+        <Label htmlFor="note">Nota</Label>
+        <Textarea id="note" name="note" placeholder="Punto de venta, referencia, etc." />
+      </div>
+      <FormMessage error={error} success={success} />
+      <Button disabled={loading} type="submit">{loading ? 'Enviando...' : 'Enviar ubicación actual'}</Button>
+    </form>
   );
 }

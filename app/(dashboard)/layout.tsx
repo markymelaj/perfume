@@ -1,56 +1,39 @@
 import Link from 'next/link';
-import { headers } from 'next/headers';
-import { requireAuthenticatedProfile } from '@/lib/auth/guards';
-import { DashboardNav } from '@/components/shared/nav';
+import { Nav } from '@/components/shared/nav';
 import { Badge } from '@/components/ui/badge';
+import { requireProfile } from '@/lib/auth/guards';
+import { isAdminRole } from '@/lib/auth/guards';
 
-const ownerItems = [
-  { href: '/owner', label: 'Resumen' },
-  { href: '/owner/users', label: 'Usuarios' },
-  { href: '/owner/products', label: 'Productos' },
-  { href: '/owner/consignments', label: 'Consignaciones' },
-  { href: '/owner/reconciliations', label: 'Rendiciones' },
-  { href: '/owner/messages', label: 'Mensajes' },
-  { href: '/owner/locations', label: 'Ubicaciones' },
-  { href: '/owner/audit', label: 'Auditoría' }
-];
-
-const sellerItems = [
-  { href: '/seller', label: 'Resumen' },
-  { href: '/seller/stock', label: 'Mi stock' },
-  { href: '/seller/sales', label: 'Ventas' },
-  { href: '/seller/cash', label: 'Caja' },
-  { href: '/seller/messages', label: 'Mensajes' },
-  { href: '/seller/location', label: 'Ubicación' }
-];
+export const dynamic = 'force-dynamic';
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { profile } = await requireAuthenticatedProfile();
-  const pathname = (await headers()).get('x-current-path') ?? '';
-  const isAdmin = profile.role === 'owner' || profile.role === 'super_admin';
-  const items = isAdmin ? ownerItems : sellerItems;
+  const profile = await requireProfile();
+
+  const items = isAdminRole(profile.role)
+    ? [{ href: '/owner', label: 'Panel admin' }]
+    : [{ href: '/seller', label: 'Panel vendedor' }];
 
   return (
-    <div className="min-h-screen bg-black">
-      <header className="border-b border-zinc-900 bg-black/90 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-6 py-5">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <div className="text-sm uppercase tracking-[0.2em] text-zinc-500">Consigna Privada</div>
-              <div className="mt-1 flex items-center gap-3">
-                <h1 className="text-2xl font-semibold text-white">{profile.display_name ?? profile.email}</h1>
-                <Badge variant={isAdmin ? 'success' : 'default'}>{profile.role}</Badge>
-                {profile.must_reenroll_security ? <Badge variant="warning">Cambio de password sugerido</Badge> : null}
-              </div>
+    <main className="min-h-screen bg-black text-white">
+      <div className="mx-auto max-w-7xl px-4 py-6 md:px-8">
+        <header className="mb-8 flex flex-col gap-4 rounded-3xl border border-zinc-800 bg-zinc-950 p-6 md:flex-row md:items-center md:justify-between">
+          <div>
+            <div className="text-sm uppercase tracking-wide text-zinc-500">Consigna Privada</div>
+            <h1 className="mt-1 text-2xl font-semibold">{profile.display_name ?? profile.email}</h1>
+            <div className="mt-2 flex items-center gap-2 text-sm text-zinc-400">
+              <Badge>{profile.role}</Badge>
+              <span>{profile.email}</span>
             </div>
-            <Link href="/logout" className="rounded-full border border-zinc-800 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-900">
+          </div>
+          <div className="flex flex-col gap-3 md:items-end">
+            <Nav items={items} />
+            <Link className="text-sm text-zinc-400 underline-offset-4 hover:underline" href="/logout">
               Cerrar sesión
             </Link>
           </div>
-          <DashboardNav items={items} currentPath={pathname} />
-        </div>
-      </header>
-      <main className="mx-auto max-w-7xl px-6 py-8">{children}</main>
-    </div>
+        </header>
+        {children}
+      </div>
+    </main>
   );
 }
