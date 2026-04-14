@@ -18,7 +18,7 @@ export async function POST(request: Request) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL!;
 
   const { data, error } = await admin.auth.admin.inviteUserByEmail(body.data.email, {
-    redirectTo: `${appUrl}/auth/callback`,
+    redirectTo: `${appUrl}/auth/confirm`,
     data: {
       display_name: body.data.displayName
     }

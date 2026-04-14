@@ -22,7 +22,7 @@ export function LoginForm({ error }: { error?: string }) {
       email,
       options: {
         shouldCreateUser: false,
-        emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`
+        emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/confirm`
       }
     });
 
@@ -54,6 +54,9 @@ export function LoginForm({ error }: { error?: string }) {
           {message ? <p className="text-sm text-zinc-400">{message}</p> : null}
           {error === 'inactive' ? (
             <p className="text-sm text-amber-300">Tu usuario no está activo. Pide al dueño que lo habilite.</p>
+          ) : null}
+          {error === 'auth' ? (
+            <p className="text-sm text-rose-300">El enlace de acceso es inválido o venció. Solicita uno nuevo.</p>
           ) : null}
         </form>
       </CardContent>

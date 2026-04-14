@@ -4,28 +4,24 @@ import { createClient } from '@/lib/supabase/server';
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
-  const code = requestUrl.searchParams.get('code');
   const token_hash = requestUrl.searchParams.get('token_hash');
   const type = requestUrl.searchParams.get('type') as EmailOtpType | null;
   const next = requestUrl.searchParams.get('next') ?? '/';
 
-  const supabase = await createClient();
-
-  if (code) {
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (!error) {
-      return NextResponse.redirect(new URL(next, requestUrl.origin));
-    }
-  }
+  const redirectTo = new URL(next, requestUrl.origin);
+  redirectTo.searchParams.delete('token_hash');
+  redirectTo.searchParams.delete('type');
+  redirectTo.searchParams.delete('next');
 
   if (token_hash && type) {
+    const supabase = await createClient();
     const { error } = await supabase.auth.verifyOtp({
       type,
       token_hash,
     });
 
     if (!error) {
-      return NextResponse.redirect(new URL(next, requestUrl.origin));
+      return NextResponse.redirect(redirectTo);
     }
   }
 
