@@ -3,7 +3,8 @@ import { z } from 'zod';
 export const inviteUserSchema = z.object({
   email: z.string().email(),
   displayName: z.string().min(2),
-  phone: z.string().optional().nullable()
+  phone: z.string().optional().nullable(),
+  password: z.string().min(8, 'La contraseña temporal debe tener al menos 8 caracteres.')
 });
 
 export const supplierSchema = z.object({
@@ -63,5 +64,11 @@ export const messageSchema = z.object({
 });
 
 export const resetAccessSchema = z.object({
-  userId: z.string().uuid()
+  userId: z.string().uuid(),
+  password: z.string().min(8, 'La nueva contraseña temporal debe tener al menos 8 caracteres.')
+});
+
+export const toggleUserStatusSchema = z.object({
+  userId: z.string().uuid(),
+  isActive: z.boolean()
 });

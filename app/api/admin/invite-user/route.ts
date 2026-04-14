@@ -5,21 +5,22 @@ import { getCurrentProfile, jsonError } from '@/app/api/_helpers';
 
 export async function POST(request: Request) {
   const { profile } = await getCurrentProfile();
-  if (!profile || profile.role !== 'owner') {
+  if (!profile || (profile.role !== 'owner' && profile.role !== 'super_admin')) {
     return jsonError('No autorizado', 403);
   }
 
   const body = inviteUserSchema.safeParse(await request.json());
   if (!body.success) {
-    return jsonError('Datos inválidos');
+    return jsonError(body.error.issues[0]?.message ?? 'Datos inválidos');
   }
 
   const admin = createAdminClient();
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL!;
 
-  const { data, error } = await admin.auth.admin.inviteUserByEmail(body.data.email, {
-    redirectTo: `${appUrl}/auth/confirm`,
-    data: {
+  const { data, error } = await admin.auth.admin.createUser({
+    email: body.data.email,
+    password: body.data.password,
+    email_confirm: true,
+    user_metadata: {
       display_name: body.data.displayName
     }
   });
@@ -47,5 +48,5 @@ export async function POST(request: Request) {
     return jsonError(profileError.message);
   }
 
-  return NextResponse.json({ message: 'Vendedor invitado correctamente.' });
+  return NextResponse.json({ message: 'Vendedor creado correctamente con contraseña temporal.' });
 }

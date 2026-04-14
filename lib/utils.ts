@@ -22,6 +22,6 @@ export function formatDate(value: string | null | undefined) {
   }).format(new Date(value));
 }
 
-export function sumNumbers(values: Array<number | string | null | undefined>): number {
-  return values.reduce<number>((acc, value) => acc + Number(value ?? 0), 0);
+export function sumNumbers(values: Array<number | string | null | undefined>) {
+  return values.reduce((acc, value) => acc + Number(value ?? 0), 0);
 }

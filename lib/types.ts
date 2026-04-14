@@ -1,4 +1,4 @@
-export type AppRole = 'owner' | 'seller';
+export type AppRole = 'super_admin' | 'owner' | 'seller';
 export type PaymentMethod = 'cash' | 'transfer' | 'mixed';
 export type ConsignmentStatus = 'open' | 'partially_reconciled' | 'closed' | 'cancelled';
 export type ReconciliationType = 'partial' | 'total';
@@ -11,6 +11,7 @@ export interface Profile {
   role: AppRole;
   is_active: boolean;
   must_reenroll_security: boolean;
+  created_at?: string;
 }
 
 export interface Supplier {

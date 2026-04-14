@@ -14,20 +14,20 @@ export function buildRemainingMap({
   const returnedMap = new Map<string, number>();
 
   for (const item of salesItems) {
-    soldMap.set(item.consignment_item_id, Number(soldMap.get(item.consignment_item_id) ?? 0) + Number(item.quantity));
+    soldMap.set(item.consignment_item_id, (soldMap.get(item.consignment_item_id) ?? 0) + item.quantity);
   }
 
   for (const item of reconciliationItems) {
     returnedMap.set(
       item.consignment_item_id,
-      Number(returnedMap.get(item.consignment_item_id) ?? 0) + Number(item.quantity_returned)
+      (returnedMap.get(item.consignment_item_id) ?? 0) + item.quantity_returned
     );
   }
 
   return new Map(
     consignmentItems.map((item) => [
       item.id,
-      Number(item.quantity_assigned) - Number(soldMap.get(item.id) ?? 0) - Number(returnedMap.get(item.id) ?? 0)
+      item.quantity_assigned - (soldMap.get(item.id) ?? 0) - (returnedMap.get(item.id) ?? 0)
     ])
   );
 }
@@ -43,20 +43,17 @@ export function buildCashSummary({
 }) {
   const saleTotals = new Map<string, number>();
   for (const item of salesItems) {
-    saleTotals.set(
-      item.sale_id,
-      Number(saleTotals.get(item.sale_id) ?? 0) + Number(item.quantity) * Number(item.unit_sale_price)
-    );
+    saleTotals.set(item.sale_id, (saleTotals.get(item.sale_id) ?? 0) + item.quantity * item.unit_sale_price);
   }
 
-  const totalSold = Number(sumNumbers(sales.map((sale) => saleTotals.get(sale.id) ?? 0)));
-  const totalRendido = Number(
-    sumNumbers(reconciliations.map((item) => Number(item.cash_received) + Number(item.transfer_received)))
+  const totalSold = sumNumbers(sales.map((sale) => saleTotals.get(sale.id) ?? 0));
+  const totalRendido = sumNumbers(
+    reconciliations.map((item) => Number(item.cash_received) + Number(item.transfer_received))
   );
 
   return {
     totalSold,
     totalRendido,
-    pendiente: Number(totalSold) - Number(totalRendido)
+    pendiente: totalSold - totalRendido
   };
 }

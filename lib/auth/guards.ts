@@ -1,6 +1,5 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import type { Profile } from '@/lib/types';
 
 export async function requireAuthenticatedProfile() {
   const supabase = await createClient();
@@ -25,7 +24,7 @@ export async function requireAuthenticatedProfile() {
 
 export async function requireOwner() {
   const result = await requireAuthenticatedProfile();
-  if (result.profile.role !== 'owner') {
+  if (!['owner', 'super_admin'].includes(result.profile.role)) {
     redirect('/seller');
   }
   return result;
@@ -33,8 +32,8 @@ export async function requireOwner() {
 
 export async function requireSeller() {
   const result = await requireAuthenticatedProfile();
-  if (result.profile.role !== 'seller') {
-    redirect('/owner');
+  if (result.profile.role === 'seller') {
+    return result;
   }
-  return result;
+  redirect('/owner');
 }

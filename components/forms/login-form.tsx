@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState, type FormEvent } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -9,7 +10,9 @@ import { Label } from '@/components/ui/label';
 
 export function LoginForm({ error }: { error?: string }) {
   const supabase = useMemo(() => createClient(), []);
+  const router = useRouter();
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -18,16 +21,22 @@ export function LoginForm({ error }: { error?: string }) {
     setLoading(true);
     setMessage(null);
 
-    const { error } = await supabase.auth.signInWithOtp({
+    const { error } = await supabase.auth.signInWithPassword({
       email,
-      options: {
-        shouldCreateUser: false,
-        emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/confirm`
-      }
+      password
     });
 
     setLoading(false);
-    setMessage(error ? error.message : 'Te enviamos un enlace de acceso.');
+
+    if (error) {
+      setMessage(error.message === 'Invalid login credentials'
+        ? 'Credenciales inválidas.'
+        : error.message);
+      return;
+    }
+
+    router.replace('/');
+    router.refresh();
   }
 
   return (
@@ -35,7 +44,7 @@ export function LoginForm({ error }: { error?: string }) {
       <CardHeader>
         <CardTitle>Consigna Privada</CardTitle>
         <p className="mt-2 text-sm text-zinc-400">
-          Acceso interno para dueños y vendedores autorizados.
+          Acceso interno para super usuarios, dueños y vendedores autorizados.
         </p>
       </CardHeader>
       <CardContent>
@@ -50,13 +59,20 @@ export function LoginForm({ error }: { error?: string }) {
               required
             />
           </div>
-          <Button disabled={loading}>{loading ? 'Enviando...' : 'Enviar acceso'}</Button>
+          <div>
+            <Label>Contraseña</Label>
+            <Input
+              type="password"
+              placeholder="Tu contraseña"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              required
+            />
+          </div>
+          <Button disabled={loading}>{loading ? 'Ingresando...' : 'Ingresar'}</Button>
           {message ? <p className="text-sm text-zinc-400">{message}</p> : null}
           {error === 'inactive' ? (
-            <p className="text-sm text-amber-300">Tu usuario no está activo. Pide al dueño que lo habilite.</p>
-          ) : null}
-          {error === 'auth' ? (
-            <p className="text-sm text-rose-300">El enlace de acceso es inválido o venció. Solicita uno nuevo.</p>
+            <p className="text-sm text-amber-300">Tu usuario no está activo. Pide al super usuario que lo habilite.</p>
           ) : null}
         </form>
       </CardContent>

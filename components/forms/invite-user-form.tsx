@@ -22,16 +22,18 @@ export function InviteUserForm() {
 
     const response = await fetch('/api/admin/invite-user', {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         email: formData.get('email'),
         displayName: formData.get('displayName'),
-        phone: formData.get('phone')
+        phone: formData.get('phone'),
+        password: formData.get('password')
       })
     });
 
     const data = await response.json();
     setLoading(false);
-    setMessage(data.message ?? (response.ok ? 'Usuario invitado.' : 'No se pudo invitar.'));
+    setMessage(data.message ?? (response.ok ? 'Usuario creado.' : 'No se pudo crear el usuario.'));
     if (response.ok) {
       event.currentTarget.reset();
       router.refresh();
@@ -57,7 +59,11 @@ export function InviteUserForm() {
             <Label>Teléfono</Label>
             <Input name="phone" placeholder="+56 9 ..." />
           </div>
-          <Button disabled={loading}>{loading ? 'Enviando...' : 'Invitar vendedor'}</Button>
+          <div>
+            <Label>Contraseña temporal</Label>
+            <Input name="password" type="text" placeholder="Min. 8 caracteres" required minLength={8} />
+          </div>
+          <Button disabled={loading}>{loading ? 'Creando...' : 'Crear vendedor'}</Button>
           <FormMessage message={message} />
         </form>
       </CardContent>

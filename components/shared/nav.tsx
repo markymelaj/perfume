@@ -15,7 +15,7 @@ export function DashboardNav({
         return (
           <Link
             key={item.href}
-            href={item.href}
+            href={item.href as never}
             className={cn(
               'rounded-full border px-3 py-2 text-sm transition',
               active
